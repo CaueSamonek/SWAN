@@ -31,7 +31,7 @@ export default class Message {
         const ctx = m.extendedTextMessage?.contextInfo;
         if (ctx?.quotedMessage){
             this.quoted = new Message(socket, {
-                key: {remoteJid: this.fromId, fromMe: ctx.participant === socket.user.id},
+                key: {remoteJid: this.fromId, fromMe: ctx.participant === socket.userId},
                 message: ctx.quotedMessage
             });
         }
@@ -52,7 +52,7 @@ export default class Message {
 
     // returns the sender's name and phone number
     async getContact() {
-        const jid = this.fromMe ? this.socket.user.id : this.author;
+        const jid = this.fromMe ? this.socket.userId : this.author;
         const number = jid.split('@')[0];
         return {name: this.fromName, number}
     }

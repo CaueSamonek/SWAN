@@ -10,13 +10,35 @@ import MessageMedia from './MessageMedia.js';
 
 //Wrapper Class For Baileys Socket
 export default class Socket extends EventEmitter {
-    // creates a socket instance
-    constructor() {
+    constructor(){
         super();
-        this.connect();
+        this.muteSessionErrors()
+        this.connect()
     }
 
-    // tries to authenticate and bind default events
+    // hide internal session errors that does not affect the use
+    muteSessionErrors(){
+        const oldLog = console.log;
+        console.log = (...args) => {
+            if (String(args[0]).includes("Closing session"))
+                return;
+
+            oldLog(...args);
+        };
+
+        const oldError = console.error;
+        console.error = (...args) => {
+            if (
+                String(args[0]).includes("Failed to decrypt") ||
+                String(args[0]).includes("Session error")
+            )
+                return;
+
+            oldError(...args);
+        };
+    }
+
+    // creates a Socket instance and tries to authenticate
     async connect() {
         await this.authenticate();
         this.bindEvents();
@@ -26,16 +48,22 @@ export default class Socket extends EventEmitter {
     async authenticate(){
         const { state, saveCreds } = await useMultiFileAuthState('auth')
         const { version } = await fetchLatestBaileysVersion()
+        const logger = P({level: 'silent'})
 
-        this.socket = makeWASocket({version, auth: state, logger: P({level: 'silent'})});
-        this.user = this.socket.user;
+        this.socket = makeWASocket({version, auth: state, logger});
+        this.userId = this.socket.user.id;
         this.socket.ev.on('creds.update', saveCreds)
     }
 
     //bind events from baileys to default treatment functions
     bindEvents(){
+        let socketReady = false
+
         //each new message emits a 'newMessage' event and a 'Message' object
         this.socket.ev.on('messages.upsert', ({messages}) => {
+            if (!socketReady)
+                return;
+
             for (const msg of messages){
                 if (!msg.message)
                     continue;
@@ -45,7 +73,7 @@ export default class Socket extends EventEmitter {
         
         //emits 'ready' when opens connection
         //on connnection lost, tries to reconnect
-        this.socket.ev.on('connection.update', (update) => {
+        this.socket.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
             if (qr)
                 qrcode.generate(qr, {small: true})
@@ -54,9 +82,11 @@ export default class Socket extends EventEmitter {
                 const shouldReconnect = lastDisconnect?.error?.output?.statusCode
                                                     !== DisconnectReason.loggedOut;
                 if (shouldReconnect)
-                    this.connect();
-            } else if (connection == 'open')
+                    await this.connect()
+            } else if (connection == 'open'){
+                soketReady = true
                 this.emit('ready');
+            }
         });
     }
 
@@ -80,7 +110,7 @@ export default class Socket extends EventEmitter {
             const isVideo = mimetype?.startsWith('video') || mimetype === 'image/gif'
             // video proportion must be 'full' to not get corrupted frames
             if (isVideo)
-                opts.stickerProportion = 'full'
+                opts.stickerType = 'full'
 
             // tries to create the sticker at the highest quality,
             // if the resulting file exceeds WhatsApp's 1MB limit
@@ -89,9 +119,9 @@ export default class Socket extends EventEmitter {
             let final_quality = 1;
             while (final_quality >= 0) {
                 const sticker = new Sticker(buffer, {
-                    pack: opts.stickerName,
+                    pack: opts.stickerPack,
                     author: opts.stickerAuthor,
-                    type: opts.stickerProportion,
+                    type: opts.stickerType,
                     quality: final_quality,
                 });
 
