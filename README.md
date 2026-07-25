@@ -53,7 +53,7 @@ socket.on("newMessage", async (msg) => {
     if (msg.fromMe)
         return;
 
-    console.log(`Message from ${msg.author}: ${msg.text}`);
+    console.log(`New Message from ${msg.fromName}`);
 
     await msg.reply("Processing your message...");
 
@@ -168,13 +168,58 @@ const media = await MessageMedia.fromUrl("https://example.com/image.png");
 
 ---
 
+### Sticker
+Converts an image or video buffer into a WhatsApp-ready sticker (WebP, 512x512, with embedded pack/author metadata).
+
+You normally don't need to call `Sticker` directly — just use `msg.reply(media, {asSticker: true})`, which handles quality adjustment automatically to stay under WhatsApp's size limit. `Sticker` is exported in case you want to generate the WebP buffer yourself.
+
+#### Options
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `stickerAuthor` | `string` | `""` | Sticker pack publisher name. |
+| `stickerPack` | `string` | `""` | Sticker pack name. |
+| `stickerType` | `string` | `"default"` | Resize/crop mode. See table below. |
+| `stickerQuality` | `number` | `80` | WebP encoding quality (0-100). |
+
+#### Sticker types
+| Type | Behavior |
+| ---- | -------- |
+| `default` | Stretches the image to fill 512x512, ignoring original proportions. |
+| `full` | Keeps original proportions, padding the rest with transparency. |
+| `crop` | Keeps original proportions, cropping the excess to fill 512x512. |
+| `circle` | Same as `crop`, masked into a circle. |
+| `rounded` | Same as `crop`, masked with rounded corners. |
+
+Videos are automatically converted to animated stickers.
+
+#### Usage
+```javascript
+import { Socket, Sticker } from "swan-api";
+const socket = new Socket();
+
+socket.on("newMessage", async (msg) => {
+    const media = await msg.downloadMedia();
+    if (!media)
+        return;
+
+    // send directly as a sticker
+    await msg.reply(media, {
+        asSticker: true,
+        stickerPack: "Bot Pack",
+        stickerAuthor: "Bot"
+    });
+});
+```
+---
+
 ## Exports
 
 ```javascript
 import {  
     Socket,
     Message,
-    MessageMedia
+    MessageMedia,
+    Sticker
 } from "swan-api";
 ```
 

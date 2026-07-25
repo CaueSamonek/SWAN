@@ -3,8 +3,11 @@ import makeWASocket, { useMultiFileAuthState, fetchLatestBaileysVersion, Disconn
 import P from 'pino'
 import qrcode from 'qrcode-terminal'
 import { EventEmitter } from "node:events";
-import { Sticker } from 'wa-sticker-formatter'
 
+import fs from "node:fs/promises";
+
+
+import Sticker from './Sticker.js'
 import Message from './Message.js';
 import MessageMedia from './MessageMedia.js';
 
@@ -51,7 +54,6 @@ export default class Socket extends EventEmitter {
         const logger = P({level: 'silent'})
 
         this.socket = makeWASocket({version, auth: state, logger});
-        this.userId = this.socket.user.id;
         this.socket.ev.on('creds.update', saveCreds)
     }
 
@@ -84,7 +86,8 @@ export default class Socket extends EventEmitter {
                 if (shouldReconnect)
                     await this.connect()
             } else if (connection == 'open'){
-                soketReady = true
+                socketReady = true
+                this.userId = this.socket.user.id;
                 this.emit('ready');
             }
         });
@@ -107,32 +110,26 @@ export default class Socket extends EventEmitter {
         
         // parse media for sticker creation
         if (opts.asSticker){
-            const isVideo = mimetype?.startsWith('video') || mimetype === 'image/gif'
-            // video proportion must be 'full' to not get corrupted frames
-            if (isVideo)
-                opts.stickerType = 'full'
+            // WhatsApp limits: 100KB for static stickers, 500KB for animated ones
+            const isAnimated = mimetype.startsWith("video/");
+            const maxBytes = (isAnimated ? 500 : 100) * 1024;
 
             // tries to create the sticker at the highest quality,
             // if the resulting file exceeds WhatsApp's 1MB limit
             // the quality is reduced by 10% and retried
             // throws an exception if quality goes below 0%
-            let final_quality = 1;
-            while (final_quality >= 0) {
-                const sticker = new Sticker(buffer, {
-                    pack: opts.stickerPack,
-                    author: opts.stickerAuthor,
-                    type: opts.stickerType,
-                    quality: final_quality,
-                });
+            let final_quality = 100;
+            while (final_quality > 0) {
+                const webp = await Sticker(buffer, {...opts,
+                                                stickerQuality : final_quality})
 
-                const webp = await sticker.toBuffer();
-                const size = (webp.length/1024)/1024;
-                if (size >= 1)
-                    final_quality -= 0.1;
+                if (webp.length > maxBytes)
+                    final_quality -= 10;
                 else
                     return await this.socket.sendMessage(jid, {sticker: webp}, opts)
             }
 
+            throw new Error(`SWAN send(): could not compress sticker below ${maxBytes / 1024}KB`);
         }
 
         //send regular files
