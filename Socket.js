@@ -83,10 +83,13 @@ export default class Socket extends EventEmitter {
             if (connection == "close"){
                 const shouldReconnect = lastDisconnect?.error?.output?.statusCode
                                                     !== DisconnectReason.loggedOut;
-                if (shouldReconnect)
+                if (shouldReconnect){
+                    this.socket.ev.removeAllListeners()
                     await this.connect()
+                }
             } else if (connection == 'open'){
                 socketReady = true
+                this.groupMetadata = this.socket.groupMetadata;
                 this.userId = this.socket.user.id;
                 this.emit('ready');
             }
