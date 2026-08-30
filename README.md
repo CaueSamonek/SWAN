@@ -1,8 +1,22 @@
 # SWAN
 
-**SWAN** (**S**imple **W**hatsApp **A**PI for **N**ode) is a lightweight wrapper around the Baileys library that provides a simpler and more intuitive interface for building WhatsApp bots in Node.js.
-
-
+<table width="100%">
+  <tr>
+    <td width="220" align="center" valign="middle">
+      <img src="./assets/logo.png" width="180" alt="SWAN Logo">
+    </td>
+    <td valign="middle">
+      <p>
+        <strong>S</strong>imple <strong>W</strong>hatsApp
+        <strong>A</strong>PI for <strong>N</strong>ode.js
+      </p>
+      <p>
+        A lightweight wrapper around the Baileys library that provides a simpler
+        and more intuitive interface for building WhatsApp bots in Node.js.
+      </p>
+    </td>
+  </tr>
+</table>
 
 ## Features
 
